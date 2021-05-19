@@ -1,0 +1,30 @@
+# https://betterprogramming.pub/k8s-tips-using-a-serviceaccount-801c433d0023
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: Role
+metadata:
+ name: scheduler-role
+ namespace: swx-infra-testci
+rules:
+- apiGroups:
+  - /
+  - ""
+  resources:
+  - pods
+  verbs: [pods, create, delete, get, list, patch, update, watch]
+- apiGroups:
+  - /
+  - ""
+  resources:
+  - pods/exec
+  verbs: [pods, create, delete, get, list, patch, update, watch]
+- apiGroups:
+  - /
+  - ""
+  resources:
+  - pods/logs
+  verbs: [get, list, watch]
+- apiGroups:
+  - /
+  resources:
+  - secrets
+  verbs: [get]

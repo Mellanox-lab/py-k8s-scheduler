@@ -1,0 +1,7 @@
+# https://betterprogramming.pub/k8s-tips-using-a-serviceaccount-801c433d0023
+#
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+ name: swx-infra-testci-sa
+ namespace: swx-infra-testci
