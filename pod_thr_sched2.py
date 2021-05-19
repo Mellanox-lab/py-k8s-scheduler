@@ -25,6 +25,8 @@ import kubernetes.client.exceptions
 import queue
 import random
 import threading
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 class JobLogger(object):
@@ -361,7 +363,14 @@ def main(args):
     # load job definition from the job file
     with open(args.job, 'r') as fi:
         job = yaml.safe_load(fi)
-    config.load_kube_config()
+    if 'KUBERNETES_PORT' in os.environ:
+        config.load_incluster_config()
+    else:
+        if 'KUBECONFIG' in job:
+            cfg_fn = job['KUBECONFIG']
+        if 'KUBECONFIG' in os.environ:
+            cfg_fn = os.environ.get('KUBECONFIG', '~/.kube/config')
+        config.load_kube_config(config_file=os.path.expanduser(cfg_fn))
     c = Configuration()
     assert os.path.exists(args.log_path) and os.path.isdir(args.log_path)
     sch = PodScheduler(
