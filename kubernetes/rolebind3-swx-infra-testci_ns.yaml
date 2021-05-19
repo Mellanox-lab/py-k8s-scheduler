@@ -1,0 +1,14 @@
+# https://betterprogramming.pub/k8s-tips-using-a-serviceaccount-801c433d0023
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: RoleBinding
+metadata:
+  name: blossom-swx-infra-testci-sa
+  namespace: swx-infra-testci
+roleRef:
+  kind: Role
+  name: scheduler-role
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+  - kind: ServiceAccount
+    name: swx-infra-testci-sa
+    namespace: swx-infra-testci

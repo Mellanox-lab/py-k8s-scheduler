@@ -1,5 +1,7 @@
-﻿# Copyright 2021 Yurii Shestakov <yuriis@nvidia.com>
-#
+#!/usr/bin/env python3
+# Copyright 2021 Yurii Shestakov <yuriis@nvidia.com>
+# Sources repo:
+#   https://github.com/Mellanox-lab/py-k8s-schedule
 
 """
 Shows the functionality of exec using a Busybox container.
