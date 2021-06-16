@@ -1,5 +1,5 @@
 # https://betterprogramming.pub/k8s-tips-using-a-serviceaccount-801c433d0023
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
  name: scheduler-role

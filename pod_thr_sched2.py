@@ -26,6 +26,7 @@ import kubernetes.client.exceptions
 # from pprint import pprint
 import queue
 import random
+import string
 import threading
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -113,7 +114,7 @@ class Worker(threading.Thread):
 
 
 class KubeWorker(Worker):
-    POD_TIMEOUT_M = 90   # pod timeout (minutes)
+    POD_TIMEOUT_M = 240  # pod timeout (minutes)
 
     def __init__(self, stop_ev, task_q, done_q,
                  pod_name, image, namespace, node_selector,
@@ -183,13 +184,31 @@ class KubeWorker(Worker):
                 'terminationGracePeriodSeconds': 3,
                 'restartPolicy': 'Never',
                 'nodeSelector': self.node_selector,
+                'volumes': [],
                 'containers': [{
                     'image': self.image,
                     'name': name,
-                    "args": [ "/bin/sh", "-c", pod_cmd ]
+                    'resources': {
+                        'limits': {'cpu': '2000m'},
+                        'requests': {'cpu': '2000m'}
+                    },
+                    "args": [ "/bin/sh", "-c", pod_cmd ],
+                    'volumesMounts': [],
                 }]
             }
         }
+        if self.host_mount:
+            pod_manifest['spec']['containers']['volumes'].append({
+                'name': 'volume-1',
+                'hostPath': {'path': self.host_mount}
+            })
+        if self.container_mount:
+            pod_manifest['spec']['containers'][0]['volumeMounts'].append({
+                'name': 'volume-1',
+                'mountPath': self.container_mount
+            })
+        print("--- POD manifest ---")
+        print(yaml.dump(pod_manifest))
         resp = self.api_instance.create_namespaced_pod(
             body=pod_manifest, namespace=self.namespace)
         while True:
@@ -292,9 +311,12 @@ class KubeWorker(Worker):
 
 class PodScheduler(object):
 
+    RAND_SFX = ''.join(random.choice(string.ascii_lowercase) for x in range(5))
+
     def __init__(self, pod_name, image, tasks, node_selector,
-            namespace='default', workers_num=50, log_path='.', verbose=False):
-        self.pod_name = pod_name
+            namespace='default', workers_num=50, log_path='.',
+            container_mount=None, host_mount=None, verbose=False):
+        self.pod_name = "{}-{}".format(pod_name, RAND_SFX)
         self.image = image
         self.tasks = tasks
         self.node_selector = node_selector
@@ -302,6 +324,8 @@ class PodScheduler(object):
         self.workers_num = workers_num
         self.log_path = log_path
         self.verbose = verbose
+        self.container_mount = container_mount
+        self.host_mount = host_mount
         self.stop_ev = threading.Event()
         self.workers = None
 
@@ -383,6 +407,8 @@ def main(args):
         namespace=job.get('ns', 'default'),
         workers_num=job.get('workers_num', 50),
         log_path=args.log_path,
+        container_mount=job.get('container_mount'),
+        host_mount=job.get('host_mount'),
         verbose=args.verbose
     )
     sch.run_scheduler()

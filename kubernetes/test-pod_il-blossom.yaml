@@ -6,17 +6,17 @@ metadata:
 spec:
   serviceAccountName: swx-infra-testci-sa
   volumes:
-#  - name: work-data
-#    hostPath:
-#        path: /.autodirect/rdmzsysgwork/yuriis/k8s/il-blossom/
+  - name: work-data
+    hostPath:
+        path: /.autodirect/mtrswgwork/yuriis/k8s/py-k8s-scheduler/
   containers:
   - name:  test-py-k8s-pod-1
     # image: harbor.mellanox.com/swx-storage/x86_64/python3-kubernetes:12.0
     image: harbor.mellanox.com/swx-storage/x86_64/py-k8s-scheduler:20210519
     imagePullPolicy: Always
     volumeMounts:
-#    - name: work-data
-#      mountPath: /work
+    - name: work-data
+      mountPath: /work
     securityContext:
       privileged: false
     tty: true

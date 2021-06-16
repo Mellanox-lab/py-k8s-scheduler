@@ -37,6 +37,7 @@ class PodScheduler(object):
         self.namespace = namespace
         self.workers_num = workers_num
         self.multiply = multiply
+        self.future_to_res = None
 
     @property
     def api_instance(self):
@@ -104,7 +105,7 @@ class PodScheduler(object):
             time.sleep(1)
         return True
 
-    def _send_signal(self, name, signal):
+    def REMOVE_send_signal(self, name, signal):
         # exec_command = ['/bin/kill', ('-%d' % signal),  '1']
         exec_command = ['/bin/touch', '/tmp/.exit']
         resp = stream(
@@ -190,15 +191,17 @@ class PodScheduler(object):
 
     def sig_handler(self, signum, frame):
         print('Signal handler called with signal', signum, file=sys.stderr)
+        for f in self.future_to_res.keys():
+            f.cancel()
+        time.sleep(1)
         raise OSError("Let's stop")
 
     def set_signal_handlers(self):
-        # signal.signal(signal.SIGTERM, self.sig_handler)
-        # signal.signal(signal.SIGINT, self.sig_handler)   # Ctrl-C
+        signal.signal(signal.SIGTERM, self.sig_handler)
+        signal.signal(signal.SIGINT, self.sig_handler)   # Ctrl-C
         pass
 
     def run_scheduler(self):
-        self.set_signal_handlers()
         if self.node_selector is None:
             self.node_selector = {
                 'beta.kubernetes.io/os': 'linux',
@@ -212,10 +215,12 @@ class PodScheduler(object):
         # Submit tasks
         with concurrent.futures.ThreadPoolExecutor(
                 max_workers=self.workers_num) as executor:
+            self.set_signal_handlers()
             future_to_res = {
                 executor.submit(self.worker3, task, i): (task, i)
                 for i, task in enumerate(self.tasks)
             }
+            self.future_to_res = future_to_res
             for future in concurrent.futures.as_completed(future_to_res):
                 cmd, pod_idx = future_to_res[future]
                 pod_name = "{}-{:03d}".format(self.name, pod_idx)
