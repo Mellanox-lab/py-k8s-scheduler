@@ -117,8 +117,8 @@ class KubeWorker(Worker):
     POD_TIMEOUT_M = 240  # pod timeout (minutes)
 
     def __init__(self, stop_ev, task_q, done_q,
-                 pod_name, image, namespace, node_selector,
-                 log_path='.', verbose=False):
+                 pod_name, image, namespace, node_selector, log_path='.',
+                 verbose=False, container_mount=None, host_mount=None):
         super().__init__(stop_ev, task_q, done_q)
         self.pod_name = pod_name
         self.image = image
@@ -126,6 +126,8 @@ class KubeWorker(Worker):
         self.node_selector = node_selector
         self.log_path = log_path
         self.verbose = verbose
+        self.container_mount = container_mount
+        self.host_mount = host_mount
         self.log = None
 
     @property
@@ -316,7 +318,7 @@ class PodScheduler(object):
     def __init__(self, pod_name, image, tasks, node_selector,
             namespace='default', workers_num=50, log_path='.',
             container_mount=None, host_mount=None, verbose=False):
-        self.pod_name = "{}-{}".format(pod_name, RAND_SFX)
+        self.pod_name = "{}-{}".format(pod_name, self.RAND_SFX)
         self.image = image
         self.tasks = tasks
         self.node_selector = node_selector
@@ -370,7 +372,9 @@ class PodScheduler(object):
                               "{}-{:03d}".format(self.pod_name, i),
                               self.image, self.namespace,
                               self.node_selector,
-                              self.log_path, self.verbose)
+                              self.log_path, self.verbose,
+                              container_mount=self.container_mount,
+                              host_mount=self.host_mount)
                           for i in range(workers_num)]
         self.workers = threads
         for t in threads:
