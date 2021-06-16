@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# Copyright 2021 Yurii Shestakov <yuriis@nvidia.com>
+# Copyright 2021 NVIDIA CORPORATION & AFFILIATES
+# Authour: Yurii Shestakov <yuriis@nvidia.com>
 # Sources repo:
 #   https://github.com/Mellanox-lab/py-k8s-schedule
 
@@ -195,12 +196,12 @@ class KubeWorker(Worker):
                         'requests': {'cpu': '2000m'}
                     },
                     "args": [ "/bin/sh", "-c", pod_cmd ],
-                    'volumesMounts': [],
+                    'volumeMounts': [],
                 }]
             }
         }
         if self.host_mount:
-            pod_manifest['spec']['containers']['volumes'].append({
+            pod_manifest['spec']['volumes'].append({
                 'name': 'volume-1',
                 'hostPath': {'path': self.host_mount}
             })
@@ -209,8 +210,9 @@ class KubeWorker(Worker):
                 'name': 'volume-1',
                 'mountPath': self.container_mount
             })
-        print("--- POD manifest ---")
-        print(yaml.dump(pod_manifest))
+        if self.verbose:
+            print("--- POD manifest ---")
+            print(yaml.dump(pod_manifest))
         resp = self.api_instance.create_namespaced_pod(
             body=pod_manifest, namespace=self.namespace)
         while True:
@@ -304,7 +306,7 @@ class KubeWorker(Worker):
                 try:
                     self.delete_pod(pod_name, True)
                 except kubernetes.client.exceptions.ApiException as e:
-                    print("%s:w3/APIERR: %s" % (pod_name, e.reason),
+                    print("%s:w4/APIERR: %s: %s" % (pod_name, e.reason, e.body),
                           file=sys.stderr)
             if self.log is not None:
                 self.log.close()
