@@ -24,11 +24,12 @@ from kubernetes.client.api import core_v1_api
 from kubernetes.client.rest import ApiException
 from kubernetes.stream import stream
 import kubernetes.client.exceptions
-# from pprint import pprint
+from pprint import pprint
 import queue
 import random
 import string
 import threading
+import traceback
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -109,8 +110,10 @@ class Worker(threading.Thread):
                 continue
             except Exception as ex:
                 print("Worker.run: {} . e: {}".format(self.tid, ex))
-                self.done_q.put((idx, ex))
-                break
+                traceback.print_exc()
+                self.done_q.put((idx, repr(ex)))
+                # break
+                continue
         print("Worker.run: {} << q".format(self.tid))
 
 
@@ -119,7 +122,8 @@ class KubeWorker(Worker):
 
     def __init__(self, stop_ev, task_q, done_q,
                  pod_name, image, namespace, node_selector, log_path='.',
-                 verbose=False, container_mount=None, host_mount=None):
+                 verbose=False, container_mount=None, host_mount=None,
+                 volumes=None, cpu_mils=1000):
         super().__init__(stop_ev, task_q, done_q)
         self.pod_name = pod_name
         self.image = image
@@ -129,6 +133,8 @@ class KubeWorker(Worker):
         self.verbose = verbose
         self.container_mount = container_mount
         self.host_mount = host_mount
+        self.volumes = volumes
+        self.cpu_mils = cpu_mils
         self.log = None
 
     @property
@@ -177,6 +183,7 @@ class KubeWorker(Worker):
                    'do echo -n "$i of {}: ";date; '
                    'test -e /tmp/.exit && exit 0 ; sleep 60; done'
                    ''.format(pod_tout_5m, pod_tout_5m))
+        cpu_m = '%dm' % self.cpu_mils
         pod_manifest = {
             'apiVersion': 'v1',
             'kind': 'Pod',
@@ -192,14 +199,24 @@ class KubeWorker(Worker):
                     'image': self.image,
                     'name': name,
                     'resources': {
-                        'limits': {'cpu': '2000m'},
-                        'requests': {'cpu': '2000m'}
+                        'limits': {'cpu': cpu_m},
+                        'requests': {'cpu': cpu_m}
                     },
                     "args": [ "/bin/sh", "-c", pod_cmd ],
                     'volumeMounts': [],
                 }]
             }
         }
+        if self.volumes:
+            for v0 in self.volumes:
+                v = v0.copy()
+                # pprint(v)
+                assert 'mountPath' in v, "No 'mountPath' in volume"
+                vmount = dict(name=v['name'], mountPath=v.pop('mountPath'))
+                pod_manifest['spec']['containers'][0]['volumeMounts'].append(
+                    vmount)
+                pod_manifest['spec']['volumes'].append(v)
+
         if self.host_mount:
             pod_manifest['spec']['volumes'].append({
                 'name': 'volume-1',
@@ -318,8 +335,9 @@ class PodScheduler(object):
     RAND_SFX = ''.join(random.choice(string.ascii_lowercase) for x in range(5))
 
     def __init__(self, pod_name, image, tasks, node_selector,
-            namespace='default', workers_num=50, log_path='.',
-            container_mount=None, host_mount=None, verbose=False):
+                 namespace='default', workers_num=50, log_path='.',
+                 container_mount=None, host_mount=None, volumes=None,
+                 cpu_mils=1000, verbose=False):
         self.pod_name = "{}-{}".format(pod_name, self.RAND_SFX)
         self.image = image
         self.tasks = tasks
@@ -330,6 +348,8 @@ class PodScheduler(object):
         self.verbose = verbose
         self.container_mount = container_mount
         self.host_mount = host_mount
+        self.cpu_mils = cpu_mils
+        self.volumes = volumes
         self.stop_ev = threading.Event()
         self.workers = None
 
@@ -376,7 +396,9 @@ class PodScheduler(object):
                               self.node_selector,
                               self.log_path, self.verbose,
                               container_mount=self.container_mount,
-                              host_mount=self.host_mount)
+                              host_mount=self.host_mount,
+                              volumes=self.volumes,
+                              cpu_mils=self.cpu_mils)
                           for i in range(workers_num)]
         self.workers = threads
         for t in threads:
@@ -415,8 +437,14 @@ def main(args):
         log_path=args.log_path,
         container_mount=job.get('container_mount'),
         host_mount=job.get('host_mount'),
+        volumes=job.get('volumes'),
+        cpu_mils=args.cpu_mils,
         verbose=args.verbose
     )
+    if sch.volumes:
+        for v in sch.volumes:
+            assert 'name' in v
+            assert 'mountPath' in v
     sch.run_scheduler()
     print("main: done")
 
@@ -429,5 +457,7 @@ if __name__ == '__main__':
                         help='Verbose output')
     parser.add_argument('-l', dest='log_path', default='.',
                         help='Verbose output')
+    parser.add_argument('-C', dest='cpu_mils', type=int, default=1000,
+                        help='pod CPU quota (mils = 1/1000)')
     args = parser.parse_args()
     main(args)
