@@ -428,7 +428,7 @@ def main(args):
     c = Configuration()
     assert os.path.exists(args.log_path) and os.path.isdir(args.log_path)
     sch = PodScheduler(
-        pod_name=job['name'],
+        pod_name=job['name'].lower(),
         image=job['image'],
         tasks=job['tasks'],
         node_selector=job.get('nodeSelector'),
