@@ -422,13 +422,15 @@ def main(args):
     else:
         if 'KUBECONFIG' in job:
             cfg_fn = job['KUBECONFIG']
-        if 'KUBECONFIG' in os.environ:
+        elif 'KUBECONFIG' in os.environ:
             cfg_fn = os.environ.get('KUBECONFIG', '~/.kube/config')
+        else:
+            cfg_fn = '~/.kube/config'
         config.load_kube_config(config_file=os.path.expanduser(cfg_fn))
     c = Configuration()
     assert os.path.exists(args.log_path) and os.path.isdir(args.log_path)
     sch = PodScheduler(
-        pod_name=job['name'],
+        pod_name=job['name'].lower(),
         image=job['image'],
         tasks=job['tasks'],
         node_selector=job.get('nodeSelector'),
